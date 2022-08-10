@@ -1,2 +1,2 @@
 # btomo
-Tomographic reconstruction of particle beam phase space distributions.
+Tomographic reconstruction of phase space distributions.
