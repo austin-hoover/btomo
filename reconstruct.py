@@ -17,17 +17,10 @@ from tqdm import tqdm
 
 from tools.utils import apply
 from tools.utils import project
+from tools.utils import get_bin_centers
+from tools.utils import get_bin_edges
 
 
-def get_bin_centers(bin_edges):
-    """Return bin centers from bin edges."""
-    return 0.5 * (bin_edges[:-1] + bin_edges[1:])
-
-
-def get_bin_edges(bin_centers):
-    """Return bin edges from bin centers."""
-    w = 0.5 * np.diff(bin_centers)[0]
-    return np.hstack([bin_centers - w, [bin_centers[-1] + w]])
 
 
 def normalize(f, bin_volume=1.0):

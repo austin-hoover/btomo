@@ -63,7 +63,7 @@ def auto_limits(X, pad=0.0, zero_center=False, sigma=None):
     
 
 def corner(
-    X, kind='hist', figsize=None, limits=None, hist_height_frac=0.6,
+    X, kind='hist', figsize=None, limits=None, diag_height_frac=0.6,
     samples=None, smooth_hist=False, thresh=None, blur=None, log=False,
     env_params=None, env_kws=None, rms_ellipse=False, rms_ellipse_kws=None,
     autolim_kws=None, grid_kws=None, diag_kws=None, **plot_kws
@@ -83,7 +83,7 @@ def corner(
         Size of the figure (x_size, y_size). 
     limits : list
         List of (min, max) for each dimension.
-    hist_height_frac : float
+    diag_height_frac : float
         Fractional reduction of 1D histogram heights.
     samples : int or float
         If an int, the number of points to use in the scatter plots. If a
@@ -231,107 +231,15 @@ def corner(
         corner_env(env_params, dims='all', axes=scatter_axes, **env_kws)
     
     # Reduce height of 1D histograms. 
-    max_hist_height = 0.
+    max_height = 0.
     for ax in axes.diagonal():
-        max_hist_height = max(max_hist_height, ax.get_ylim()[1])
-    max_hist_height /= hist_height_frac
+        max_height = max(max_height, ax.get_ylim()[1])
+    max_height /= diag_height_frac
     for ax in axes.diagonal():
-        ax.set_ylim(0, max_hist_height)
+        ax.set_ylim(0, max_height)
         
     return axes
-
-
-def _corner_no_diag(axes, X, kind, thresh, blur, idx, n_bins, limits,
-                    env_params, env_kws, Sigma, rms_ellipse_kws, **plot_kws):
-    """Helper function for `corner`."""
-    if kind == 'hist':
-        bins = plot_kws.pop('bins')
-    for i in range(1, len(axes) + 1):
-        for j in range(i + 1):
-            ax = axes[i - 1, j]
-            if kind == 'scatter':
-                x, y = X[idx, j], X[idx, i]
-                ax.plot(x, y, **plot_kws)
-            elif kind == 'hist':
-                x, y = X[:, j], X[:, i]
-                if bins == 'auto':
-                    Z, xedges, yedges = np.histogram2d(
-                        x, y, (n_bins[j], n_bins[i]), (limits[j], limits[i]))
-                else:
-                    Z, xedges, yedges = np.histogram2d(
-                        x, y, bins, (limits[j], limits[i]))
-                if blur:
-                    Z = filters.gaussian(Z, sigma=blur)
-                if thresh:
-                    Z = np.ma.masked_less_equal(Z, thresh)
-                xcenters = utils.get_bin_centers(xedges)
-                ycenters = utils.get_bin_centers(yedges)
-                ax.pcolormesh(xcenters, ycenters, Z.T, **plot_kws)
-    if Sigma is not None:
-        rms_ellipses(Sigma, axes=axes, **rms_ellipse_kws)
-    if env_params is not None:
-        corner_env(env_params, dims='all', axes=axes, **env_kws)
-    return axes
     
-    
-def ellipse(ax, c1, c2, angle=0.0, center=(0, 0), **plt_kws):
-    """Plot ellipse with semi-axes `c1` and `c2`. Angle is given in radians
-    and is measured below the x axis."""
-    plt_kws.setdefault('fill', False)
-    return ax.add_patch(Ellipse(center, 2*c1, 2*c2, -np.degrees(angle), **plt_kws))
-
-
-def rms_ellipses(
-    Sigmas, axes=None, figsize=(5, 5), pad=0.5, constrained_layout=True,
-    cmap=None, cmap_range=(0, 1), centers=None, return_artists=False, 
-    return_fig=False, 
-    **plt_kws
-):
-    """Plot rms ellipse parameters directly from covariance matrix."""
-    Sigmas = np.array(Sigmas)
-    if Sigmas.ndim == 2:
-        Sigmas = Sigmas[np.newaxis, :, :]
-    if axes is None:
-        x2_max, y2_max = np.max(Sigmas[:, 0, 0]), np.max(Sigmas[:, 2, 2])
-        xp2_max, yp2_max = np.max(Sigmas[:, 1, 1]), np.max(Sigmas[:, 3, 3])
-        umax = (1 + pad) * np.sqrt(max(x2_max, y2_max))
-        upmax = (1 + pad) * np.sqrt(max(xp2_max, yp2_max))
-        limits = 2 * [(-umax, umax), (-upmax, upmax)]
-        fig, axes = pair_grid_nodiag(4, figsize, limits, constrained_layout=constrained_layout)
-
-    colors = None
-    if len(Sigmas) > 1 and cmap is not None:
-        start, end = cmap_range
-        colors = [cmap(i) for i in np.linspace(start, end, len(Sigmas))]
-        
-    if centers is None:
-        centers = 4 * [0.0]
-    
-    dims = {0:'x', 1:'xp', 2:'y', 3:'yp'}
-    artists = []
-    for l, Sigma in enumerate(Sigmas):
-        for i in range(3):
-            for j in range(i + 1):
-                angle, c1, c2 = rms_ellipse_dims(Sigma, dims[j], dims[i + 1])
-                if colors is not None:
-                    plt_kws['color'] = colors[l]
-                xcenter = centers[j]
-                ycenter = centers[i + 1]
-                artist = ellipse(axes[i, j], c1, c2, angle,
-                             center=(xcenter, ycenter), **plt_kws)
-                artists.append(artist)
-    items = []
-    if return_fig:
-        items.append(fig)
-    items.append(axes)
-    if return_artists:
-        return items.append(artists)
-    if len(items) == 1:
-        items = items[0]
-    return items
-
-
-
 
 
 # Images
@@ -348,6 +256,20 @@ def prep_image_for_log(image, handle_log='floor'):
             image = np.ma.masked_less_equal(image, 0)
     return image
 
+
+def plot1d(x, y, ax=None, flipxy=False, kind='step', **kws):
+    funcs = {
+        'line': ax.plot,
+        'bar': ax.bar,
+        'step': ax.plot,
+    }
+    if kind == 'step':
+        kws.setdefault('drawstyle', 'steps-mid')
+    if flipxy:
+        x, y = y, x
+        funcs['bar'] = ax.barh
+    return funcs[kind](x, y, **kws)
+    
 
 def plot_profile(image, xcoords=None, ycoords=None, ax=None, profx=True, profy=True, 
                  kind='step', scale=0.12, **plot_kws):
@@ -366,24 +288,14 @@ def plot_profile(image, xcoords=None, ycoords=None, ax=None, profx=True, profy=T
         return profile
     
     px, py = [_normalize(np.sum(image, axis=i)) for i in (1, 0)]
-    x1 = xcoords
-    y1 = ycoords[0] + scale * np.abs(ycoords[-1] - ycoords[0]) * px
-    x2 = xcoords[0] + scale * np.abs(xcoords[-1] - xcoords[0]) * py
-    y2 = ycoords
-    for i, (x, y) in enumerate(zip([x1, x2], [y1, y2])):
+    yy = ycoords[0] + scale * np.abs(ycoords[-1] - ycoords[0]) * px
+    xx = xcoords[0] + scale * np.abs(xcoords[-1] - xcoords[0]) * py
+    for i, (x, y) in enumerate(zip([xcoords, ycoords], [yy, xx])):
         if i == 0 and not profx:
             continue
         if i == 1 and not profy:
             continue
-        if kind == 'line':
-            ax.plot(x, y, **plot_kws)
-        elif kind == 'bar':
-            if i == 0:
-                ax.bar(x, y, **plot_kws)
-            else:
-                ax.barh(y, x, **plot_kws)
-        elif kind == 'step':
-            ax.plot(x, y, drawstyle='steps-mid', **plot_kws)
+        plot1d(x, y, ax=ax, flipxy=i, kind=kind, **plot_kws)
     return ax
 
 
@@ -434,97 +346,171 @@ def plot_image(
     else:
         return ax
 
-
-def corner_im(
-    image, 
-    coords=None,
-    labels=None, 
-    diag_kind='step',
-    frac_thresh=None,
-    fig_kws=None, 
-    diag_kws=None, 
-    prof=False,
-    prof_kws=None,
-    return_fig=False,
-    hist_height_frac=0.8,
-    **plot_kws
-):
-    """Plot all 1D/2D projections of n-dimensional `image`."""
-    n = image.ndim
+    
+def _setup_corner(n, diag, labels, limits=None, **fig_kws):
     if labels is None:
         labels = n * ['']
-    if fig_kws is None:
-        fig_kws = dict()
-    if diag_kws is None:
-        diag_kws = dict()
-    diag = diag_kind in ['line', 'bar', 'step']
-    if diag:
-        nrows = ncols = n        
-        diag_kws.setdefault('color', 'black')
-        diag_kws.setdefault('lw', 1.0)
-    else:
-        nrows = ncols = n - 1
+    nrows = ncols = n if diag else n - 1 
     fig_kws.setdefault('figwidth', 1.5 * nrows)
     fig_kws.setdefault('aligny', True)
-    plot_kws.setdefault('ec', 'None')
-    
-    if coords is None:
-        coords = [np.arange(s) for s in image.shape]
-        
-    # Formatting.
     fig, axes = pplt.subplots(nrows=nrows, ncols=ncols, sharex=1, sharey=1, 
                               spanx=False, spany=False, **fig_kws)
-    start = 1 if diag else 0
     for i in range(nrows):
         for j in range(ncols):
             if j > i:
                 axes[i, j].axis('off')
     for ax, label in zip(axes[-1, :], labels):
         ax.format(xlabel=label)
+    start = 1 if diag else 0
     for ax, label in zip(axes[start:, 0], labels[start:]):
         ax.format(ylabel=label)
-    for j in range(ncols):
-        axes[:-1, j].format(xticklabels=[])
     for i in range(nrows):
+        axes[:-1, i].format(xticklabels=[])
         axes[i, 1:].format(yticklabels=[])
     for ax in axes:
         ax.format(xspineloc='bottom', yspineloc='left')
-                
-    # Plot off-diagonal.
-    for ii, i in enumerate(range(start, axes.shape[0])):
-        for j in range(ii + 1):
-            ax = axes[i, j]
-            if prof == 'edges':
-                profy = j == 0
-                profx = i == axes.shape[0] - 1
-            else:
-                profx = profy = prof
-            H = utils.project(image, (j, ii + 1))
-            plot_image(utils.project(image, (j, ii + 1)), x=coords[j], y=coords[ii + 1], 
-                       ax=ax, profx=profx, profy=profy, prof_kws=prof_kws, **plot_kws)
-            
-    # Plot diagonal.
     if diag:
-        for i in range(n):
-            ax = axes[i, i]
-            h = utils.project(image, j)
-            h = h / np.max(h)
-            if diag_kind == 'line':
-                ax.plot(coords[i], h, **diag_kws)
-            elif diag_kind == 'bar':
-                ax.bar(coords[i], h, **diag_kws)
-            elif diag_kind == 'step':
-                ax.plot(coords[i], h, drawstyle='steps-mid', **diag_kws)
-                
-    # Reduce diagonal histogram height.
-    if diag:
-        max_hist_height = 0.
         for i in range(n):
             axes[i, i].format(yspineloc='neither')
-            max_hist_height = max(max_hist_height, axes[i, i].get_ylim()[1])
-        max_hist_height /= hist_height_frac
+    if limits is not None:
         for i in range(n):
-            axes[i, i].set_ylim(0, max_hist_height)
+            axes[:, i].format(xlim=limits[i])
+            if i >= start:
+                axes[i, :].format(ylim=limits[i])
+    return fig, axes
+
+
+def corner(
+    data, 
+    kind='hist',
+    diag_kind='step',
+    coords=None,
+    limits=None,
+    labels=None, 
+    samples=None,
+    autolim_kws=None, 
+    diag_kws=None, 
+    fig_kws=None, 
+    prof=False,
+    prof_kws=None,
+    return_fig=False,
+    diag_height_frac=0.8,
+    **plot_kws
+):
+    # Figure out if data is discrete points or N-D image
+    n = data.ndim
+    pts = False
+    if n == 2:
+        n = data.shape[1]
+        pts = True
+    diag = diag_kind in ['line', 'bar', 'step']
+    start = 1 if diag else 0
+    if diag_kws is None:
+        diag_kws = dict()
+    diag_kws.setdefault('kind', 'step')
+    diag_kws.setdefault('color', 'black')
+    diag_kws.setdefault('lw', 1.0)
+    if pts and kind =='scatter':
+        plot_kws.setdefault('s', 6)
+        plot_kws.setdefault('c', 'black')
+        plot_kws.setdefault('marker', '.')
+        plot_kws.setdefault('ec', 'none')
+        if 'color' in plot_kws:
+            plot_kws['c'] = plot_kws.pop('color')
+        if 'ms' in plot_kws:
+            plot_kws['s'] = plot_kws.pop('ms')
+    elif (pts and kind == 'hist') or not pts:
+        plot_kws.setdefault('ec', 'None')
+        
+    # Create the figure.
+    if autolim_kws is None:
+        autolim_kws = dict()  
+    if fig_kws is None:
+        fig_kws = dict()
+    if limits is None and pts:
+        limits = auto_limits(data, **autolim_kws)
+    fig, axes = _setup_corner(n, diag, labels, limits, **fig_kws)
+    
+    # Discrete points
+    if pts:    
+        # Univariate plots
+        bins = 'auto'
+        if 'bins' in plot_kws:
+            bins = plot_kws.pop('bins')
+        edges, centers = [], []
+        for i in range(n):
+            heights, _edges = np.histogram(data[:, i], bins, limits[i])
+            _centers = utils.get_bin_centers(_edges)
+            edges.append(_edges)
+            centers.append(_centers)
+            if diag:
+                plot1d(_centers, heights, ax=axes[i, i], **diag_kws)
+
+        # Take random sample.
+        idx = np.arange(data.shape[0])
+        if samples is not None and samples < data.shape[0]:
+            if type(samples) is float:
+                N = int(samples * data.shape[0])
+            else:
+                N = samples
+            idx = utils.rand_rows(idx, N)
+
+        # Bivariate plots
+        for ii, i in enumerate(range(start, axes.shape[0])):
+            for j in range(ii + 1):
+                ax = axes[i, j]
+                if kind == 'scatter':
+                    ax.scatter(data[idx, j], data[idx, ii + 1], **plot_kws)
+                elif kind == 'hist':
+                    _im, _, _ = np.histogram2d(data[:, j], data[:, ii + 1], (edges[j], edges[ii + 1]))
+                    if prof == 'edges':
+                        profy = j == 0
+                        profx = i == axes.shape[0] - 1
+                    else:
+                        profx = profy = prof
+                    plot_image(
+                        _im, 
+                        x=centers[j],
+                        y=centers[ii + 1],
+                        ax=ax,
+                        profx=profx, profy=profy, prof_kws=prof_kws, 
+                        **plot_kws
+                    )       
+    # N-D image
+    else:
+        if coords is None:
+            coords = [np.arange(s) for s in data.shape]
+            
+        # Plot off-diagonal.
+        for ii, i in enumerate(range(start, axes.shape[0])):
+            for j in range(ii + 1):
+                ax = axes[i, j]
+                if prof == 'edges':
+                    profy = j == 0
+                    profx = i == axes.shape[0] - 1
+                else:
+                    profx = profy = prof
+                plot_image(
+                    utils.project(data, (j, ii + 1)), 
+                    x=coords[j], y=coords[ii + 1], ax=ax, 
+                    profx=profx, profy=profy, prof_kws=prof_kws, 
+                    **plot_kws
+                )             
+        # Plot diagonal.
+        if diag:
+            for i in range(n):
+                h = utils.project(data, j)
+                plot1d(coords[i], h / np.max(h), ax=axes[i, i], **diag_kws)
+
+    # Modify diagonal y axis limits.
+    if diag:
+        max_height = 0.
+        for i in range(n):
+            max_height = max(max_height, axes[i, i].get_ylim()[1])
+        max_height /= diag_height_frac
+        for i in range(n):
+            axes[i, i].set_ylim(0, max_height)
+
     if return_fig:
         return fig, axes
     return axes
