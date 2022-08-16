@@ -565,18 +565,19 @@ def corner(
 
 
 
-
 # Interactive
 # ------------------------------------------------------------------------------
 def interactive_proj2d(
     f, 
     coords=None,
     default_ind=(0, 1),
-    slider_type='int',  # {'int', 'range'}
+    slice_type='int',  # {'int', 'range'}
     dims=None,
     units=None,
     prof_kws=None,
     cmaps=None,
+    handle_log='floor',
+    frac_thresh=None,
     **plot_kws,
 ):
     """Interactive plot of 2D projection of distribution `f`.
@@ -592,7 +593,7 @@ def interactive_proj2d(
         Coordinate arrays along each dimension. A square grid is assumed.
     default_ind : (i, j)
         Default x and y index to plot.
-    slider_type : {'int', 'range'}
+    slice_type : {'int', 'range'}
         Whether to slice one index along the axis or a range of indices.
     dims : list[str], shape (n,)
         Dimension names.
@@ -600,7 +601,10 @@ def interactive_proj2d(
         Dimension units.
     prof_kws : dict
         Key word arguments for 1D profile plots.
-    cmaps : dict
+    cmaps : list
+        Color map options.
+    handle_log : {'floor', 'mask'}
+        See `plot_image`.
     
     Returns
     -------
@@ -618,7 +622,6 @@ def interactive_proj2d(
     dims_units = []
     for dim, unit in zip(dims, units):
         dims_units.append(f'{dim}' + f' [{unit}]' if unit != '' else dim)
-    dim_to_int = {dim: i for i, dim in enumerate(dims)}
     if prof_kws is None:
         prof_kws = dict()
     prof_kws.setdefault('lw', 1.0)
@@ -629,8 +632,10 @@ def interactive_proj2d(
         cmaps = ['viridis', 'dusk_r', 'mono_r', 'plasma']
     plot_kws.setdefault('colorbar', True)
     plot_kws['prof_kws'] = prof_kws
+    plot_kws['handle_log'] = handle_log
     
     # Widgets
+    handle_log = widgets.Dropdown(options=['floor', 'mask'], description='handle_log')
     cmap = widgets.Dropdown(options=cmaps, description='cmap')
     thresh = widgets.FloatSlider(value=-5.0, min=-8.0, max=0.0, step=0.1, 
                                  description='thresh', continuous_update=True)
@@ -649,20 +654,20 @@ def interactive_proj2d(
     # Sliders
     sliders, checks = [], []
     for k in range(n):
-        if slider_type == 'int':
+        if slice_type == 'int':
             slider = widgets.IntSlider(
                 min=0, max=f.shape[k], value=f.shape[k]//2,
                 description=dims[k], 
                 continuous_update=True,
             )
-        elif slider_type == 'range':
+        elif slice_type == 'range':
             slider = widgets.IntRangeSlider(
                 value=(0, f.shape[k]), min=0, max=f.shape[k],
                 description=dims[k], 
                 continuous_update=True,
             )
         else:
-            raise ValueError('Invalid `slider_type`.')
+            raise ValueError('Invalid `slice_type`.')
         slider.layout.display = 'none'
         sliders.append(slider)
         checks.append(widgets.Checkbox(description=f'slice {dims[k]}'))
@@ -695,7 +700,7 @@ def interactive_proj2d(
                 
     # I don't know how else to do this.
     def _update3(
-        cmap, log, profiles, fix_vmax, vmax,
+        handle_log, cmap, log, profiles, fix_vmax, vmax,
         dim1, dim2, 
         check1, check2, check3,
         slider1, slider2, slider3,
@@ -706,10 +711,11 @@ def interactive_proj2d(
         for dim, check in zip(dims, checks):
             if check and dim in (dim1, dim2):
                 return
-        return _plot_figure(dim1, dim2, checks, sliders, log, profiles, thresh, cmap, fix_vmax, vmax)
+        return _plot_figure(dim1, dim2, checks, sliders, log, profiles, 
+                            thresh, cmap, handle_log, fix_vmax, vmax)
 
     def _update4(
-        cmap, log, profiles, fix_vmax, vmax,
+        handle_log, cmap, log, profiles, fix_vmax, vmax,
         dim1, dim2, 
         check1, check2, check3, check4, 
         slider1, slider2, slider3, slider4,
@@ -720,10 +726,11 @@ def interactive_proj2d(
         for dim, check in zip(dims, checks):
             if check and dim in (dim1, dim2):
                 return
-        return _plot_figure(dim1, dim2, checks, sliders, log, profiles, thresh, cmap, fix_vmax, vmax)
+        return _plot_figure(dim1, dim2, checks, sliders, log, profiles, 
+                            thresh, cmap, handle_log, fix_vmax, vmax)
 
     def _update5(
-        cmap, log, profiles, fix_vmax, vmax,
+        handle_log, cmap, log, profiles, fix_vmax, vmax,
         dim1, dim2, 
         check1, check2, check3, check4, check5,
         slider1, slider2, slider3, slider4, slider5,
@@ -734,10 +741,11 @@ def interactive_proj2d(
         for dim, check in zip(dims, checks):
             if check and dim in (dim1, dim2):
                 return
-        return _plot_figure(dim1, dim2, checks, sliders, log, profiles, thresh, cmap, fix_vmax, vmax)
+        return _plot_figure(dim1, dim2, checks, sliders, log, profiles, 
+                            thresh, cmap, handle_log, fix_vmax, vmax)
 
     def _update6(
-        cmap, log, profiles, fix_vmax, vmax,
+        handle_log, cmap, log, profiles, fix_vmax, vmax,
         dim1, dim2, 
         check1, check2, check3, check4, check5, check6,
         slider1, slider2, slider3, slider4, slider5, slider6,
@@ -748,7 +756,8 @@ def interactive_proj2d(
         for dim, check in zip(dims, checks):
             if check and dim in (dim1, dim2):
                 return
-        return _plot_figure(dim1, dim2, checks, sliders, log, profiles, thresh, cmap, fix_vmax, vmax)
+        return _plot_figure(dim1, dim2, checks, sliders, log, profiles,
+                            thresh, cmap, handle_log, fix_vmax, vmax)
 
     update = {
         3: _update3,
@@ -757,11 +766,11 @@ def interactive_proj2d(
         6: _update6,
     }[n]
     
-    def _plot_figure(dim1, dim2, checks, sliders, log, profiles, thresh, cmap, fix_vmax, vmax):
+    def _plot_figure(dim1, dim2, checks, sliders, log, profiles, thresh, cmap, handle_log, fix_vmax, vmax):
         if (dim1 == dim2):
             return
-        axis_view = [dim_to_int[dim] for dim in (dim1, dim2)]
-        axis_slice = [dim_to_int[dim] for dim, check in zip(dims, checks) if check]
+        axis_view = [dims.index(dim) for dim in (dim1, dim2)]
+        axis_slice = [dims.index(dim) for dim, check in zip(dims, checks) if check]
         ind = sliders
         for k in range(n):
             if type(ind[k]) is int:
@@ -776,6 +785,7 @@ def interactive_proj2d(
             'frac_thresh': 10.0**thresh,
             'norm': 'log' if log else None,
             'vmax': vmax if fix_vmax else None,
+            'handle_log': handle_log,
         })
         fig, ax = pplt.subplots()
         plot_image(H, x=coords[axis_view[0]], y=coords[axis_view[1]], ax=ax, **plot_kws)
@@ -795,5 +805,208 @@ def interactive_proj2d(
     kws['fix_vmax'] = fix_vmax
     kws['vmax'] = vmax
     kws['cmap'] = cmap
+    kws['handle_log'] = handle_log
+    gui = interactive(update, **kws)
+    return gui
+
+
+def interactive_proj1d(
+    f, 
+    coords=None,
+    default_ind=0,
+    slice_type='int',  # {'int', 'range'}
+    dims=None,
+    units=None,
+    kind='bar',
+    **plot_kws,
+):
+    """Interactive plot of 1D projection of distribution `f`.
+    
+    The distribution is projected onto the specified axis. Sliders provide the
+    option to slice the distribution before projecting.
+    
+    Parameters
+    ----------
+    f : ndarray
+        An n-dimensional array.
+    coords : list[ndarray]
+        Grid coordinates for each dimension.
+    default_ind : int
+        Default index to plot.
+    slice_type : {'int', 'range'}
+        Whether to slice one index along the axis or a range of indices.
+    dims : list[str], shape (n,)
+        Dimension names.
+    units : list[str], shape (n,)
+        Dimension units.
+    kind : {'bar', 'line'}
+        The kind of plot to draw.
+    **plot_kws
+        Key word arguments passed to 1D plotting function.
+        
+    Returns
+    -------
+    gui : ipywidgets.widgets.interaction.interactive
+        This widget can be displayed by calling `IPython.display.display(gui)`. 
+    """
+    n = f.ndim
+    if coords is None:
+        coords = [np.arange(f.shape[k]) for k in range(n)]
+    
+    if dims is None:
+        dims = [f'x{i + 1}' for i in range(n)]
+    if units is None:
+        units = n * ['']
+    dims_units = []
+    for dim, unit in zip(dims, units):
+        dims_units.append(f'{dim}' + f' [{unit}]' if unit != '' else dim)
+    plot_kws.setdefault('color', 'black')
+    
+    # Widgets
+    dim1 = widgets.Dropdown(options=dims, index=default_ind, description='dim')
+    
+    # Sliders
+    sliders, checks = [], []
+    for k in range(n):
+        if slice_type == 'int':
+            slider = widgets.IntSlider(
+                min=0, max=f.shape[k], value=f.shape[k]//2,
+                description=dims[k], 
+                continuous_update=True,
+            )
+        elif slice_type == 'range':
+            slider = widgets.IntRangeSlider(
+                value=(0, f.shape[k]), min=0, max=f.shape[k],
+                description=dims[k], 
+                continuous_update=True,
+            )
+        else:
+            raise ValueError('Invalid `slice_type`.')
+        slider.layout.display = 'none'
+        sliders.append(slider)
+        checks.append(widgets.Checkbox(description=f'slice {dims[k]}'))
+        
+    # Hide/show sliders.
+    def hide(button):
+        for k in range(n):
+            # Hide elements for dimensions being plotted.
+            valid = dims[k] != dim1.value
+            disp = None if valid else 'none'
+            for element in [sliders[k], checks[k]]:
+                element.layout.display = disp
+            # Uncheck boxes for dimensions being plotted. 
+            if not valid and checks[k].value:
+                checks[k].value = False
+            # Make sliders respond to check boxes.
+            if not checks[k].value:
+                sliders[k].layout.display = 'none'
+                    
+    for element in (dim1, *checks):
+        element.observe(hide, names='value')
+    # Initial hide
+    for k in range(n):
+        if k == default_ind:
+            checks[k].layout.display = 'none'
+            sliders[k].layout.display = 'none'
+                
+    # I don't know how else to do this.
+    def _update2(
+        dim1, 
+        check1, check2,
+        slider1, slider2,
+    ):
+        checks = [check1, check2]
+        sliders = [slider1, slider2]
+        for dim, check in zip(dims, checks):
+            if check and dim == dim1:
+                return
+        return _plot_figure(dim1, checks, sliders)
+
+    def _update3(
+        dim1, 
+        check1, check2, check3,
+        slider1, slider2, slider3,
+    ):
+        checks = [check1, check2, check3]
+        sliders = [slider1, slider2, slider3]
+        for dim, check in zip(dims, checks):
+            if check and dim == dim1:
+                return
+        return _plot_figure(dim1, checks, sliders)
+    
+    def _update4(
+        dim1, 
+        check1, check2, check3, check4,
+        slider1, slider2, slider3, slider4,
+    ):
+        checks = [check1, check2, check3, check4]
+        sliders = [slider1, slider2, slider3, slider4]
+        for dim, check in zip(dims, checks):
+            if check and dim == dim1:
+                return
+        return _plot_figure(dim1, checks, sliders)
+
+    def _update5(
+        dim1, 
+        check1, check2, check3, check4, check5,
+        slider1, slider2, slider3, slider4, slider5,
+    ):
+        checks = [check1, check2, check3, check4, check5]
+        sliders = [slider1, slider2, slider3, slider4, slider5]
+        for dim, check in zip(dims, checks):
+            if check and dim == dim1:
+                return
+        return _plot_figure(dim1, checks, sliders)
+    
+    def _update6(
+        dim1, 
+        check1, check2, check3, check4, check5, check6,
+        slider1, slider2, slider3, slider4, slider5, slider6,
+    ):
+        checks = [check1, check2, check3, check4, check5, check6]
+        sliders = [slider1, slider2, slider3, slider4, slider5, slider6]
+        for dim, check in zip(dims, checks):
+            if check and dim == dim1:
+                return
+        return _plot_figure(dim1, checks, sliders)
+
+    update_dict = {
+        2: _update2,
+        3: _update3,
+        4: _update4,
+        5: _update5,
+        6: _update6,
+    }
+    update = update_dict[n]
+    
+    def _plot_figure(dim1, checks, sliders):
+        axis_view = dims.index(dim1)
+        axis_slice = [dims.index(dim) for dim, check in zip(dims, checks) if check]
+        ind = sliders
+        for k in range(n):
+            if type(ind[k]) is int:
+                ind[k] = (ind[k], ind[k] + 1)
+        ind = [ind[k] for k in axis_slice]
+        _f = f[utils.make_slice(f.ndim, axis_slice, ind)]
+        p = utils.project(_f, axis_view)
+
+        fig, ax = pplt.subplots(figsize=(4.5, 1.5))
+        ax.format(xlabel=dims_units[axis_view])
+        x = coords[axis_view]
+        y = p / np.sum(p)
+        if kind == 'bar':
+            ax.bar(x, y, **plot_kws)
+        elif kind == 'line':
+            ax.plot(x, y, **plot_kws)
+        elif kind == 'step':
+            ax.plot(x, y, drawstyle='steps-mid', **plot_kws)
+        plt.show()
+        
+    kws = dict()
+    kws['dim1'] = dim1
+    for i, check in enumerate(checks, start=1):
+        kws[f'check{i}'] = check
+    for i, slider in enumerate(sliders, start=1):
+        kws[f'slider{i}'] = slider
     gui = interactive(update, **kws)
     return gui
