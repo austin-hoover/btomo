@@ -1,6 +1,12 @@
 import numpy as np
 
 
+def rotation_matrix(angle):
+    """2x2 clockwise rotation matrix."""
+    c, s = np.cos(angle), np.sin(angle)
+    return np.array([[c, s], [-s, c]])
+
+
 def get_bin_centers(bin_edges):
     """Return bin centers from bin edges."""
     return 0.5 * (bin_edges[:-1] + bin_edges[1:])
@@ -57,3 +63,8 @@ def make_slice(n, axis=0, ind=0):
             continue
         idx[k] = slice(i[0], i[1]) if type(i) in [tuple, list, np.ndarray] else i
     return tuple(idx)
+
+
+def hist(X, bins='auto'):
+    edges = [np.histogram_bin_edges(X[:, i], bins) for i in range(X.shape[1])]
+    return np.histogramdd(X, edges)
