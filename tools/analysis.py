@@ -9,8 +9,8 @@ from .utils import symmetrize
 def mat2vec(cov):
     """Return vector of N*(N-1)/2 independent elements in NxN symmetric matrix."""
     return cov[np.triu_indices(cov.shape[0])]
-                  
-                  
+
+
 def vec2mat(moment_vec):
     """Inverse of `mat2vec`."""
     cov = np.zeros((4, 4))
@@ -29,36 +29,40 @@ def rms_ellipse_semiaxes(sig_xx, sig_yy, sig_xy):
     """Return semi-axes rms ellipse in x-y plane."""
     angle = rms_ellipse_angle(sig_xx, sig_yy, sig_xy)
     sn, cs = np.sin(angle), np.cos(angle)
-    cx = np.sqrt(abs(sig_xx*cs**2 + sig_yy*sn**2 - 2*sig_xy*sn*cs))
-    cy = np.sqrt(abs(sig_xx*sn**2 + sig_yy*cs**2 + 2*sig_xy*sn*cs))
+    cx = np.sqrt(abs(sig_xx * cs ** 2 + sig_yy * sn ** 2 - 2 * sig_xy * sn * cs))
+    cy = np.sqrt(abs(sig_xx * sn ** 2 + sig_yy * cs ** 2 + 2 * sig_xy * sn * cs))
     return cx, cy
 
-    
-def rms_ellipse_dims(cov, x1='x', x2='y'):
+
+def rms_ellipse_dims(cov, x1="x", x2="y"):
     """Return (angle, c1, c2) of rms ellipse in x1-x2 plane, where angle is the
     clockwise tilt angle and c1/c2 are the semi-axes.
     """
-    str_to_int = {'x':0, 'xp':1, 'y':2, 'yp':3}
+    str_to_int = {"x": 0, "xp": 1, "y": 2, "yp": 3}
     i, j = str_to_int[x1], str_to_int[x2]
     sii, sjj, sij = cov[i, i], cov[j, j], cov[i, j]
     angle = rms_ellipse_angle(sii, sjj, sij)
     c1, c2 = rms_ellipse_semiaxes(sii, sjj, sij)
     return angle, c1, c2
-    
-    
+
+
 def intrinsic_emittances(cov, order=False):
     """Return intrinsic emittances from covariance matrix."""
-    U = np.array([[0.0, 1.0, 0.0, 0.0], 
-                  [-1.0, 0.0, 0.0, 0.0], 
-                  [0.0, 0.0, 0.0, 1.0], 
-                  [0.0, 0.0, -1.0, 0.0]])
+    U = np.array(
+        [
+            [0.0, 1.0, 0.0, 0.0],
+            [-1.0, 0.0, 0.0, 0.0],
+            [0.0, 0.0, 0.0, 1.0],
+            [0.0, 0.0, -1.0, 0.0],
+        ]
+    )
     trSU2 = np.trace(la.matrix_power(np.matmul(cov, U), 2))
     detS = la.det(cov)
-    eps_1 = 0.5 * np.sqrt(-trSU2 + np.sqrt(trSU2**2 - 16.0 * detS))
-    eps_2 = 0.5 * np.sqrt(-trSU2 - np.sqrt(trSU2**2 - 16.0 * detS))
+    eps_1 = 0.5 * np.sqrt(-trSU2 + np.sqrt(trSU2 ** 2 - 16.0 * detS))
+    eps_2 = 0.5 * np.sqrt(-trSU2 - np.sqrt(trSU2 ** 2 - 16.0 * detS))
     return eps_1, eps_2
-    
-    
+
+
 def apparent_emittances(cov):
     """Return apparent emittances from covariance matrix."""
     eps_x = np.sqrt(la.det(cov[:2, :2]))
@@ -77,8 +81,8 @@ def coupling_coefficient(cov):
     eps_1, eps_2 = intrinsic_emittances(cov)
     eps_x, eps_y = apparent_emittances(cov)
     return 1.0 - np.sqrt((eps_1 * eps_2) / (eps_x * eps_y))
-    
-    
+
+
 def twiss2D(cov):
     """Return 2D Twiss parameters from covariance matrix."""
     eps_x, eps_y = apparent_emittances(cov)
@@ -87,7 +91,7 @@ def twiss2D(cov):
     alpha_x = -cov[0, 1] / eps_x
     alpha_y = -cov[2, 3] / eps_y
     return np.array([alpha_x, alpha_y, beta_x, beta_y])
-    
+
 
 def beam_stats(cov):
     """Return dictionary of parameters from NxN covariance matrix.
@@ -117,14 +121,14 @@ def beam_stats(cov):
         'alpha_y': alpha_y = -<yy'> / eps_y
     """
     stats = dict()
-    stats['cov'] = cov
-    stats['corr'] = cov2corr(cov)
-    stats['alpha_x'], stats['alpha_y'], stats['beta_x'], stats['beta_y'] = twiss2D(cov)
-    stats['eps_x'], stats['eps_y'] = apparent_emittances(cov)
-    stats['eps_1'], stats['eps_2'] = intrinsic_emittances(cov)
-    stats['eps_4D'] = stats['eps_1'] * stats['eps_2']
-    stats['eps_4D_app'] = stats['eps_x'] * stats['eps_y']
-    stats['C'] = np.sqrt(stats['eps_4D'] / stats['eps_4D_app'])
+    stats["cov"] = cov
+    stats["corr"] = cov2corr(cov)
+    stats["alpha_x"], stats["alpha_y"], stats["beta_x"], stats["beta_y"] = twiss2D(cov)
+    stats["eps_x"], stats["eps_y"] = apparent_emittances(cov)
+    stats["eps_1"], stats["eps_2"] = intrinsic_emittances(cov)
+    stats["eps_4D"] = stats["eps_1"] * stats["eps_2"]
+    stats["eps_4D_app"] = stats["eps_x"] * stats["eps_y"]
+    stats["C"] = np.sqrt(stats["eps_4D"] / stats["eps_4D_app"])
     return stats
 
 
@@ -151,9 +155,9 @@ def dist_cov(f, coords, verbose=False):
         The distribution centroid.
     """
     if verbose:
-        print(f'Forming {f.shape} meshgrid...')
+        print(f"Forming {f.shape} meshgrid...")
     if coords[0].ndim == 1:
-        COORDS = np.meshgrid(*coords, indexing='ij')
+        COORDS = np.meshgrid(*coords, indexing="ij")
     else:
         COORDS = coords
     n = f.ndim
@@ -161,7 +165,7 @@ def dist_cov(f, coords, verbose=False):
     if f_sum == 0:
         return np.zeros((n, n)), np.zeros((n,))
     if verbose:
-        print('Averaging...')
+        print("Averaging...")
     mu = np.array([np.average(C, weights=f) for C in COORDS])
     cov = np.zeros((n, n))
     _range = trange if disp else range
@@ -175,5 +179,5 @@ def dist_cov(f, coords, verbose=False):
             cov[i, j] = EXY - EX * EY
     cov = utils.symmetrize(cov)
     if verbose:
-        print('Done.')
+        print("Done.")
     return cov, mu

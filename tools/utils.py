@@ -74,6 +74,6 @@ def make_slice(n, axis=0, ind=0):
     return tuple(idx)
 
 
-def hist(X, bins='auto'):
+def hist(X, bins="auto"):
     edges = [np.histogram_bin_edges(X[:, i], bins) for i in range(X.shape[1])]
     return np.histogramdd(X, edges)

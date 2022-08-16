@@ -29,8 +29,8 @@ def phase_adv_matrix_4x4(mu1, mu2):
 def norm_matrix(alpha, beta):
     """2x2 normalization matrix for x-x' or y-y'."""
     return np.array([[beta, 0], [-alpha, 1]]) / np.sqrt(beta)
-    
-    
+
+
 def norm_matrix_4x4_uncoupled(alpha_x, alpha_y, beta_x, beta_y):
     """4x4 normalization matrix for x-x' and y-y', i.e., no off-block-diagonal elements."""
     V = np.zeros((4, 4))
@@ -41,8 +41,8 @@ def norm_matrix_4x4_uncoupled(alpha_x, alpha_y, beta_x, beta_y):
 
 def cov_from_twiss2D(alpha_x, alpha_y, beta_x, beta_y, eps_x, eps_y):
     """Construct covariance matrix from 2D Twiss parameters."""
-    gamma_x = (1.0 + alpha_x**2) / beta_x
-    gamma_y = (1.0 + alpha_y**2) / beta_y
+    gamma_x = (1.0 + alpha_x ** 2) / beta_x
+    gamma_y = (1.0 + alpha_y ** 2) / beta_y
     Sigma = np.zeros((4, 4))
     Sigma[:2, :2] = eps_x * np.array([[beta_x, -alpha_x], [-alpha_x, gamma_x]])
     Sigma[2:, 2:] = eps_y * np.array([[beta_y, -alpha_y], [-alpha_y, gamma_y]])
