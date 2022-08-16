@@ -34,8 +34,8 @@ def norm_matrix(alpha, beta):
 def norm_matrix_4x4_uncoupled(alpha_x, alpha_y, beta_x, beta_y):
     """4x4 normalization matrix for x-x' and y-y', i.e., no off-block-diagonal elements."""
     V = np.zeros((4, 4))
-    V[:2, :2] = V_matrix_2x2(alpha_x, beta_x)
-    V[2:, 2:] = V_matrix_2x2(alpha_y, beta_y)
+    V[:2, :2] = norm_matrix(alpha_x, beta_x)
+    V[2:, 2:] = norm_matrix(alpha_y, beta_y)
     return V
 
 

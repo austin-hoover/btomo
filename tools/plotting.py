@@ -374,10 +374,10 @@ def _setup_corner(n, diag, labels, limits=None, **fig_kws):
         for i in range(n):
             axes[i, i].format(yspineloc='neither')
     if limits is not None:
-        for i in range(n):
+        for i in range(ncols):
             axes[:, i].format(xlim=limits[i])
-            if i >= start:
-                axes[i, :].format(ylim=limits[i])
+        for i in range(start, nrows):
+            axes[i, :].format(ylim=limits[i])
     return fig, axes
 
 
@@ -389,15 +389,67 @@ def corner(
     limits=None,
     labels=None, 
     samples=None,
+    diag_height_frac=0.8,
     autolim_kws=None, 
     diag_kws=None, 
     fig_kws=None, 
     prof=False,
     prof_kws=None,
     return_fig=False,
-    diag_height_frac=0.8,
     **plot_kws
 ):
+    """Plot 1D/2D projections in a grid of subplots.
+################################################################################
+    Parameters
+    ----------
+    data : ndarray
+        If `data.ndim == 2`, we have a list of N points in D-dimensional space;
+        otherwise, we have a D-dimensional image, i.e., density array.
+    kind : {'hist', 'scatter'}
+        The kind of 2D plot to make if `data` is a list of points. 
+            'hist': 2D histogram
+            'scatter': 2D scatter plot
+    diag_kind : {'line', 'step', 'bar', 'None'}
+        Kind of 1D plot on diagonal axes. Any variant of 'None', 'none', None 
+        will remove the diagonal axes from the figure, resulting in a D-1 x D-1
+        array of subplots instead of a D x D array.
+    coords : list[ndarray]
+        Coordinates along each axis of the grid (if `data` is an image).
+    limits : list[tuple]
+        The (min, max) coordinates for each dimension. This is used to set the
+        axis limits, as well as for data binning if plotting a histogram.
+    labels : list[str]
+        The axis labels.
+    samples : int or float
+        Number of samples to use in scatter plots. If less than 1, specifies
+        the fraction of points.
+    diag_height_frac : float
+        Reduce the height of 1D profiles (diagonal subplots) relative to the 
+        y axis height.
+    autolim_kws : dict
+        Key word arguments passed to `autolim`.
+    diag_kws : dict
+        Key word arguments passed to 1D plotting function on diagonal axes.
+    fig_kws : dict
+        Key word arguments passed to `pplt.subplots` such as 'figwidth'.
+    prof : bool or 'edges'
+        Whether to overlay 1D profiles on 2D plots in off-diagonal axes. If
+        'edges', only plot profiles in the left column and bottom row of
+        the figure. This is a good option if not using diagonal subplots.
+    prof_kws : dict
+        Key word arguments passed to `plot_profiles`.
+    return_fig : bool
+        Whether to return `fig` in addition to `axes`.
+    **plot_kws
+        Key word arguments passed to 2D plotting function.
+    
+    Returns
+    -------
+    fig : proplot.figure
+        Proplot figure object.
+    axes : proplot.gridspec
+        Array of subplot axes.
+    """
     # Figure out if data is discrete points or N-D image
     n = data.ndim
     pts = False
@@ -408,7 +460,6 @@ def corner(
     start = 1 if diag else 0
     if diag_kws is None:
         diag_kws = dict()
-    diag_kws.setdefault('kind', 'step')
     diag_kws.setdefault('color', 'black')
     diag_kws.setdefault('lw', 1.0)
     if pts and kind =='scatter':
@@ -438,23 +489,23 @@ def corner(
         bins = 'auto'
         if 'bins' in plot_kws:
             bins = plot_kws.pop('bins')
-        edges, centers = [], []
+        edges, centers, max_height = [], [], 0
         for i in range(n):
-            heights, _edges = np.histogram(data[:, i], bins, limits[i])
+            heights, _edges = np.histogram(data[:, i], bins, limits[i], density=True)
             _centers = utils.get_bin_centers(_edges)
             edges.append(_edges)
             centers.append(_centers)
+            max_height = max(max_height, np.max(heights))
             if diag:
-                plot1d(_centers, heights, ax=axes[i, i], **diag_kws)
+                plot1d(_centers, heights, ax=axes[i, i], kind=diag_kind, **diag_kws)
 
-        # Take random sample.
+        # Take random sample of points.
         idx = np.arange(data.shape[0])
         if samples is not None and samples < data.shape[0]:
-            if type(samples) is float:
-                N = int(samples * data.shape[0])
-            else:
-                N = samples
-            idx = utils.rand_rows(idx, N)
+            if samples < 1:
+                # Convert from fraction of points to number of points.
+                samples = samples * data.shape[0]
+            idx = utils.rand_rows(idx, int(samples))
 
         # Bivariate plots
         for ii, i in enumerate(range(start, axes.shape[0])):
@@ -482,7 +533,7 @@ def corner(
         if coords is None:
             coords = [np.arange(s) for s in data.shape]
             
-        # Plot off-diagonal.
+        # Bivariate plots
         for ii, i in enumerate(range(start, axes.shape[0])):
             for j in range(ii + 1):
                 ax = axes[i, j]
@@ -497,7 +548,7 @@ def corner(
                     profx=profx, profy=profy, prof_kws=prof_kws, 
                     **plot_kws
                 )             
-        # Plot diagonal.
+        # Univariate plots
         if diag:
             for i in range(n):
                 h = utils.project(data, j)
@@ -505,12 +556,8 @@ def corner(
 
     # Modify diagonal y axis limits.
     if diag:
-        max_height = 0.
         for i in range(n):
-            max_height = max(max_height, axes[i, i].get_ylim()[1])
-        max_height /= diag_height_frac
-        for i in range(n):
-            axes[i, i].set_ylim(0, max_height)
+            axes[i, i].set_ylim(0, max_height / diag_height_frac)
 
     if return_fig:
         return fig, axes

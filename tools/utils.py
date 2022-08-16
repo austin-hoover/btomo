@@ -34,6 +34,15 @@ def symmetrize(M):
     return M + M.T - np.diag(M.diagonal())
 
 
+def rand_rows(X, n):
+    """Return n random elements of X."""
+    Xsamp = np.copy(X)
+    if n < len(X):
+        idx = np.random.choice(Xsamp.shape[0], n, replace=False)
+        Xsamp = Xsamp[idx]
+    return Xsamp
+
+
 def apply(M, X):
     """Apply M to each row of X."""
     return np.apply_along_axis(lambda x: np.matmul(M, x), 1, X)
