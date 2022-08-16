@@ -200,6 +200,8 @@ def _setup_corner(n, diag, labels, limits=None, **fig_kws):
             axes[:, i].format(xlim=limits[i])
         for i in range(start, nrows):
             axes[i, :].format(ylim=limits[i])
+    for ax in axes:
+        ax.format(xtickminor=True, ytickminor=True)
     return fig, axes
 
 
@@ -211,7 +213,7 @@ def corner(
     limits=None,
     labels=None, 
     samples=None,
-    diag_height_frac=0.8,
+    diag_height_frac=0.7,
     autolim_kws=None, 
     diag_kws=None, 
     fig_kws=None, 
@@ -311,13 +313,13 @@ def corner(
         bins = 'auto'
         if 'bins' in plot_kws:
             bins = plot_kws.pop('bins')
-        edges, centers, max_height = [], [], 0
+        edges, centers = [], []
         for i in range(n):
             heights, _edges = np.histogram(data[:, i], bins, limits[i], density=True)
+            heights = heights / np.max(heights)
             _centers = utils.get_bin_centers(_edges)
             edges.append(_edges)
             centers.append(_centers)
-            max_height = max(max_height, np.max(heights))
             if diag:
                 plot1d(_centers, heights, ax=axes[i, i], kind=diag_kind, **diag_kws)
 
@@ -354,7 +356,6 @@ def corner(
     else:
         if coords is None:
             coords = [np.arange(s) for s in data.shape]
-            
         # Bivariate plots
         for ii, i in enumerate(range(start, axes.shape[0])):
             for j in range(ii + 1):
@@ -375,12 +376,10 @@ def corner(
             for i in range(n):
                 h = utils.project(data, j)
                 plot1d(coords[i], h / np.max(h), ax=axes[i, i], **diag_kws)
-
     # Modify diagonal y axis limits.
     if diag:
         for i in range(n):
-            axes[i, i].set_ylim(0, max_height / diag_height_frac)
-
+            axes[i, i].set_ylim(0, 1.0 / diag_height_frac)
     if return_fig:
         return fig, axes
     return axes
