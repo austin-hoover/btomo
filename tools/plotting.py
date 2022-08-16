@@ -121,10 +121,6 @@ def corner(
     -------
     axes : ndarray, shape (d, d)
         Array of subplots.
-    
-    To do
-    -----
-    * Option to plot d-dimensional histogram instead of a coordinate array.
     """
     # Default key word arguments.
     if kind =='scatter' or kind == 'scatter_density':
@@ -245,192 +241,6 @@ def corner(
     return axes
 
 
-def corner(
-    data, 
-    dtype='points',
-    coords=None,
-    labels=None, 
-    kind='hist',
-    diag_kind='line',
-    frac_thresh=None,
-    fig_kws=None, 
-    diag_kws=None, 
-    prof=False,
-    prof_kws=None,
-    cbar=False,
-    return_fig=False,
-    **plot_kws
-):
-    """Plot all 1D/2D projections in a matrix of subplots."""
-    if data.ndim > 2:
-        dtype = 'image'
-    
-    n = data.ndim
-    if labels is None:
-        labels = n * ['']
-    if fig_kws is None:
-        fig_kws = dict()
-    fig_kws.setdefault(
-        'figwidth', 
-        1.5 * (n - 1 if diag_kind in ['None', 'none', None] else n),
-    )
-    fig_kws.setdefault('aligny', True)
-    
-    # Set default key word arguments.
-    if diag_kws is None:
-        diag_kws = dict()                
-    if dtype == 'image':
-        plot_kws.setdefault('ec', 'None')
-        diag_kws.setdefault('color', 'black')
-        if diag_kind == 'step':
-            diag_kws.setdefault('drawstyle', 'steps-mid')
-    elif dtype == 'points':
-        if kind =='scatter' or kind == 'scatter_density':
-            plot_kws.setdefault('s', 5)
-            plot_kws.setdefault('color', 'black')
-            plot_kws.setdefault('marker', '.')
-            plot_kws.setdefault('ec', 'none')
-        elif kind == 'hist':
-            plot_kws.setdefault('bins', 'auto')
-        diag_kws.setdefault('color', 'black')
-        diag_kws.setdefault('histtype', 'step')
-        diag_kws.setdefault('bins', 'auto')
-    
-    if coords is None:
-        coords = [np.arange(s) for s in image.shape]
-    
-    if diag_kind is None or diag_kind.lower() == 'none':
-        axes = _corner_nodiag(
-            image, 
-            coords=coords,
-            labels=labels, 
-            frac_thresh=frac_thresh,
-            fig_kws=fig_kws, 
-            prof=prof,
-            prof_kws=prof_kws,
-            return_fig=return_fig,
-            cbar=cbar,
-            **plot_kws
-        )
-        return axes
-    
-    fig, axes = pplt.subplots(
-        nrows=n, ncols=n, sharex=1, sharey=1,
-        spanx=False, spany=False, **fig_kws
-    )
-    for i in range(n):
-        for j in range(n):
-            ax = axes[i, j]
-            if j > i:
-                ax.axis('off')
-            elif i == j:
-                h = utils.project(image, j)
-                h = h / np.max(h)
-                if diag_kind == 'line':
-                    ax.plot(coords[j], h, **diag_kws)
-                elif diag_kind == 'bar':
-                    ax.bar(coords[j], **diag_kws)
-                elif diag_kind == 'step':
-                    ax.plot(coords[j], h, **diag_kws)
-            else:
-                if prof == 'edges':
-                    profx = i == n - 1
-                    profy = j == 0
-                else:
-                    profx = profy = prof
-                H = utils.project(image, (j, i))
-                plot_image(
-                    H, ax=ax, x=coords[j], y=coords[i],
-                    profx=profx, profy=profy, prof_kws=prof_kws, 
-                    frac_thresh=frac_thresh, 
-                    **plot_kws
-                )
-                
-    for ax, label in zip(axes[-1, :], labels):
-        ax.format(xlabel=label)
-    for ax, label in zip(axes[1:, 0], labels[1:]):
-        ax.format(ylabel=label)
-    for i in range(n):
-        axes[:-1, i].format(xticklabels=[])
-        if i > 0:
-            axes[i, 1:].format(yticklabels=[])
-    xlims = [ax.get_xlim() for ax in axes[-1, :]]
-    xlims[-1] = axes[-1, 0].get_ylim()
-    for i, xlim in enumerate(xlims):
-        axes[i, i].format(xlim=xlim)
-    if return_fig:
-        return fig, axes
-    return axes
-
-
-def _corner_nodiag(
-    image, 
-    coords=None,
-    labels=None, 
-    frac_thresh=None,
-    fig_kws=None, 
-    prof=False,
-    prof_kws=None,
-    return_fig=False,
-    cbar=False,
-    **plot_kws
-):
-    n = image.ndim
-    if labels is None:
-        labels = n * ['']
-    if fig_kws is None:
-        fig_kws = dict()
-    fig_kws.setdefault('figwidth', 1.5 * (n - 1))
-    fig_kws.setdefault('aligny', True)
-    plot_kws.setdefault('ec', 'None')
-    
-    fig, axes = pplt.subplots(
-        nrows=n-1, ncols=n-1, 
-        spanx=False, spany=False, **fig_kws
-    )
-    for i in range(n - 1):
-        for j in range(n - 1):
-            ax = axes[i, j]
-            if j > i:
-                ax.axis('off')
-                continue
-            if prof == 'edges':
-                profy = j == 0
-                profx = i == n - 2
-            else:
-                profx = profy = prof
-            H = utils.project(image, (j, i + 1))
-            H = H / np.max(H)
-            x = coords[j]
-            y = coords[i + 1]
-            if x.ndim > 1:
-                axis = [k for k in range(x.ndim) if k not in (j, i + 1)]
-                ind = len(axis) * [0]
-                idx = utils.make_slice(x.ndim, axis, ind)
-                x = x[idx]
-                y = y[idx]
-            #########
-            if cbar:
-                if i == 0 and j == 0:
-                    plot_kws['colorbar'] = 't'
-                    plot_kws['colorbar_kw'] = dict(width=0.065)
-                else:
-                    plot_kws['colorbar'] = False
-            ########
-            plot_image(H, ax=ax, x=x, y=y,
-                       profx=profx, profy=profy, prof_kws=prof_kws, 
-                       frac_thresh=frac_thresh, **plot_kws)
-    for ax, label in zip(axes[-1, :], labels):
-        ax.format(xlabel=label)
-    for ax, label in zip(axes[:, 0], labels[1:]):
-        ax.format(ylabel=label)
-    if return_fig:
-        return fig, axes
-    return axes
-
-
-
-
 def _corner_no_diag(axes, X, kind, thresh, blur, idx, n_bins, limits,
                     env_params, env_kws, Sigma, rms_ellipse_kws, **plot_kws):
     """Helper function for `corner`."""
@@ -519,3 +329,202 @@ def rms_ellipses(
     if len(items) == 1:
         items = items[0]
     return items
+
+
+
+
+
+# Images
+# ------------------------------------------------------------------------------
+def prep_image_for_log(image, handle_log='floor'):
+    image_max = np.max(image)
+    if np.any(image <= 0):
+        if handle_log == 'floor':
+            floor = 1e-12
+            if image_max > 0:
+                floor = np.min(image[image > 0])
+            image = image + floor
+        elif handle_log == 'mask':
+            image = np.ma.masked_less_equal(image, 0)
+    return image
+
+
+def plot_profile(image, xcoords=None, ycoords=None, ax=None, profx=True, profy=True, 
+                 kind='step', scale=0.12, **plot_kws):
+    """Plot 1D projection of image along axis."""
+    if xcoords is None:
+        xcoords = np.arange(image.shape[1])
+    if ycoords is None:
+        ycoords = np.arange(image.shape[0])
+    plot_kws.setdefault('lw', 0.75)
+    plot_kws.setdefault('color', 'white')
+    
+    def _normalize(profile):
+        pmax = np.max(profile)
+        if pmax > 0:
+            profile = profile / pmax
+        return profile
+    
+    px, py = [_normalize(np.sum(image, axis=i)) for i in (1, 0)]
+    x1 = xcoords
+    y1 = ycoords[0] + scale * np.abs(ycoords[-1] - ycoords[0]) * px
+    x2 = xcoords[0] + scale * np.abs(xcoords[-1] - xcoords[0]) * py
+    y2 = ycoords
+    for i, (x, y) in enumerate(zip([x1, x2], [y1, y2])):
+        if i == 0 and not profx:
+            continue
+        if i == 1 and not profy:
+            continue
+        if kind == 'line':
+            ax.plot(x, y, **plot_kws)
+        elif kind == 'bar':
+            if i == 0:
+                ax.bar(x, y, **plot_kws)
+            else:
+                ax.barh(y, x, **plot_kws)
+        elif kind == 'step':
+            ax.plot(x, y, drawstyle='steps-mid', **plot_kws)
+    return ax
+
+
+def plot_image(
+    image, 
+    x=None, 
+    y=None, 
+    ax=None, 
+    profx=False, 
+    profy=False, 
+    prof_kws=None, 
+    frac_thresh=None, 
+    contour=False, 
+    contour_kws=None,
+    return_mesh=False, 
+    handle_log='mask', 
+    **plot_kws
+):
+    """Plot 2D image."""
+    log = 'norm' in plot_kws and plot_kws['norm'] == 'log'
+    if log:
+        if 'colorbar' in plot_kws and plot_kws['colorbar']:
+            if 'colorbar_kw' not in plot_kws:
+                plot_kws['colorbar_kw'] = dict()
+            plot_kws['colorbar_kw']['formatter'] = 'log'
+        image = prep_image_for_log(image, handle_log)
+    if contour and contour_kws is None:
+        contour_kws = dict()
+        contour_kws.setdefault('color', 'white')
+        contour_kws.setdefault('lw', 1.0)
+        contour_kws.setdefault('alpha', 0.5)
+    if prof_kws is None:
+        prof_kws = dict()
+    if x is None:
+        x = np.arange(image.shape[0])
+    if y is None:
+        y = np.arange(image.shape[1])
+    if x.ndim == 2:
+        x = x.T
+    if y.ndim == 2:
+        y = y.T
+    mesh = ax.pcolormesh(x, y, image.T, **plot_kws)
+    if contour:
+        ax.contour(x, y, image.T, **contour_kws)
+    plot_profile(image, xcoords=x, ycoords=y, ax=ax, profx=profx, profy=profy, **prof_kws)
+    if return_mesh:
+        return ax, mesh
+    else:
+        return ax
+
+
+def corner_im(
+    image, 
+    coords=None,
+    labels=None, 
+    diag_kind='step',
+    frac_thresh=None,
+    fig_kws=None, 
+    diag_kws=None, 
+    prof=False,
+    prof_kws=None,
+    return_fig=False,
+    hist_height_frac=0.8,
+    **plot_kws
+):
+    """Plot all 1D/2D projections of n-dimensional `image`."""
+    n = image.ndim
+    if labels is None:
+        labels = n * ['']
+    if fig_kws is None:
+        fig_kws = dict()
+    if diag_kws is None:
+        diag_kws = dict()
+    diag = diag_kind in ['line', 'bar', 'step']
+    if diag:
+        nrows = ncols = n        
+        diag_kws.setdefault('color', 'black')
+        diag_kws.setdefault('lw', 1.0)
+    else:
+        nrows = ncols = n - 1
+    fig_kws.setdefault('figwidth', 1.5 * nrows)
+    fig_kws.setdefault('aligny', True)
+    plot_kws.setdefault('ec', 'None')
+    
+    if coords is None:
+        coords = [np.arange(s) for s in image.shape]
+        
+    # Formatting.
+    fig, axes = pplt.subplots(nrows=nrows, ncols=ncols, sharex=1, sharey=1, 
+                              spanx=False, spany=False, **fig_kws)
+    start = 1 if diag else 0
+    for i in range(nrows):
+        for j in range(ncols):
+            if j > i:
+                axes[i, j].axis('off')
+    for ax, label in zip(axes[-1, :], labels):
+        ax.format(xlabel=label)
+    for ax, label in zip(axes[start:, 0], labels[start:]):
+        ax.format(ylabel=label)
+    for j in range(ncols):
+        axes[:-1, j].format(xticklabels=[])
+    for i in range(nrows):
+        axes[i, 1:].format(yticklabels=[])
+    for ax in axes:
+        ax.format(xspineloc='bottom', yspineloc='left')
+                
+    # Plot off-diagonal.
+    for ii, i in enumerate(range(start, axes.shape[0])):
+        for j in range(ii + 1):
+            ax = axes[i, j]
+            if prof == 'edges':
+                profy = j == 0
+                profx = i == axes.shape[0] - 1
+            else:
+                profx = profy = prof
+            H = utils.project(image, (j, ii + 1))
+            plot_image(utils.project(image, (j, ii + 1)), x=coords[j], y=coords[ii + 1], 
+                       ax=ax, profx=profx, profy=profy, prof_kws=prof_kws, **plot_kws)
+            
+    # Plot diagonal.
+    if diag:
+        for i in range(n):
+            ax = axes[i, i]
+            h = utils.project(image, j)
+            h = h / np.max(h)
+            if diag_kind == 'line':
+                ax.plot(coords[i], h, **diag_kws)
+            elif diag_kind == 'bar':
+                ax.bar(coords[i], h, **diag_kws)
+            elif diag_kind == 'step':
+                ax.plot(coords[i], h, drawstyle='steps-mid', **diag_kws)
+                
+    # Reduce diagonal histogram height.
+    if diag:
+        max_hist_height = 0.
+        for i in range(n):
+            axes[i, i].format(yspineloc='neither')
+            max_hist_height = max(max_hist_height, axes[i, i].get_ylim()[1])
+        max_hist_height /= hist_height_frac
+        for i in range(n):
+            axes[i, i].set_ylim(0, max_hist_height)
+    if return_fig:
+        return fig, axes
+    return axes
