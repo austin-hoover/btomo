@@ -67,17 +67,16 @@ def auto_limits(X, pad=0.0, zero_center=False, sigma=None):
 
 # Images
 # ------------------------------------------------------------------------------
-def prep_image_for_log(image, handle_log='floor'):
-    image_max = np.max(image)
-    if np.any(image <= 0):
-        if handle_log == 'floor':
-            floor = 1e-12
-            if image_max > 0:
-                floor = np.min(image[image > 0])
-            image = image + floor
-        elif handle_log == 'mask':
-            image = np.ma.masked_less_equal(image, 0)
-    return image
+def prep_image_for_log(image, method='floor'):
+    if np.all(image > 0):
+        return image
+    if method == 'floor':
+        floor = 1e-12
+        if np.max(image) > 0:
+            floor = np.min(image[image > 0])
+        return image + floor
+    elif method == 'mask':
+        return np.ma.masked_less_equal(image, 0)
 
 
 def plot1d(x, y, ax=None, flipxy=False, kind='step', **kws):
@@ -130,15 +129,24 @@ def plot_image(
     profx=False, 
     profy=False, 
     prof_kws=None, 
-    frac_thresh=None, 
+    thresh=None, 
+    thresh_type='abs',  # {'abs', 'frac'}
     contour=False, 
     contour_kws=None,
     return_mesh=False, 
-    handle_log='mask', 
+    handle_log='floor', 
+    fill_value=None,
     **plot_kws
 ):
     """Plot 2D image."""
+    plot_kws.setdefault('ec', 'None')
     log = 'norm' in plot_kws and plot_kws['norm'] == 'log'
+    if fill_value is not None:
+        image = np.ma.filled(image, fill_value=fill_value)
+    if thresh is not None:
+        if thresh_type == 'frac':
+            thresh = thresh * np.max(image)
+        image[image < max(1e-12, thresh)] = 0
     if log:
         if 'colorbar' in plot_kws and plot_kws['colorbar']:
             if 'colorbar_kw' not in plot_kws:
@@ -171,6 +179,7 @@ def plot_image(
 
     
 def _setup_corner(n, diag, labels, limits=None, **fig_kws):
+    """Set up corner plot axes."""
     if labels is None:
         labels = n * ['']
     nrows = ncols = n if diag else n - 1 
@@ -213,7 +222,7 @@ def corner(
     limits=None,
     labels=None, 
     samples=None,
-    diag_height_frac=0.7,
+    diag_height_frac=0.6,
     autolim_kws=None, 
     diag_kws=None, 
     fig_kws=None, 
@@ -397,7 +406,7 @@ def interactive_proj2d(
     units=None,
     prof_kws=None,
     cmaps=None,
-    handle_log='floor',
+    handle_log='mask',
     frac_thresh=None,
     **plot_kws,
 ):
@@ -458,7 +467,7 @@ def interactive_proj2d(
     # Widgets
     handle_log = widgets.Dropdown(options=['floor', 'mask'], description='handle_log')
     cmap = widgets.Dropdown(options=cmaps, description='cmap')
-    thresh = widgets.FloatSlider(value=-5.0, min=-8.0, max=0.0, step=0.1, 
+    thresh = widgets.FloatSlider(value=-8.0, min=-8.0, max=0.0, step=0.1, 
                                  description='thresh', continuous_update=True)
     discrete = widgets.Checkbox(value=False, description='discrete')
     log = widgets.Checkbox(value=False, description='log')
@@ -599,14 +608,17 @@ def interactive_proj2d(
         ind = [ind[k] for k in axis_slice]
         H = f[utils.make_slice(f.ndim, axis_slice, ind)]
         H = utils.project(H, axis_view)
+        H = np.ma.masked_less_equal(H, 10.0**thresh)
         plot_kws.update({
             'profx': profiles,
             'profy': profiles,
             'cmap': cmap,
-            'frac_thresh': 10.0**thresh,
+            'thresh': 10.0**thresh,
+            'thresh_type': 'frac',
             'norm': 'log' if log else None,
             'vmax': vmax if fix_vmax else None,
             'handle_log': handle_log,
+            'fill_value': 0,
         })
         fig, ax = pplt.subplots()
         plot_image(H, x=coords[axis_view[0]], y=coords[axis_view[1]], ax=ax, **plot_kws)
