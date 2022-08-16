@@ -304,7 +304,7 @@ def hock4D(
                 projections, tmats_y, grid_meas[1], grid_rec[1], method=method, **kws
             )
     f = process(f, **proc_kws)
-    return Z
+    return f
 
 
 def art4D(projections, tmats, grid_rec, grid_meas, proc_kws=None, **kws):
