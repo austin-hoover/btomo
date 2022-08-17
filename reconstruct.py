@@ -265,7 +265,10 @@ def hock4D(
     grid_meas : ndarray, shape (2, nbins)
         Coordinates of x and y bin centers on the screen.
     grid_rec : ndarray, shape (2, nbins)
-        Coordinates of x and y bin centers on the reconstruction grid.
+        Coordinates of x and y bin centers on the reconstruction grid. Currently,
+        the method assumes we are reconstructing in normalized phase space so 
+        that x' and y' have the same units as x and y; the x' and y' grid 
+        size and resolution are chosen to be the same as x and y.
     tmats_x{y} : ndarray, shape (n_proj, 2, 2)
         List of 2 x 2 transfer matrices for x-x'{y-y'}.
     method : {'SART', 'FBP', 'MENT'}
