@@ -319,7 +319,7 @@ def art4D(projections, tmats, grid_rec, grid_meas, proc_kws=None, **kws):
     
     P is a very sparse matrix. Currently, `scipy.sparse.linalg.lsqr` is used. A 
     grid size of N = 50 has been used successfuly, but N = 75 gave an 'out of 
-    memory' error.
+    memory' error. 
     
     Parameters
     ----------
@@ -407,9 +407,11 @@ def art4D(projections, tmats, grid_rec, grid_meas, proc_kws=None, **kws):
 
 def pic4D(projections, tmats, grid_rec, grid_meas, max_iters=15):
     """Four-dimensional reconstruction using particle tracking 
-    (not currently working).
     
-    The method is described in Wang et al. (2019). 
+    This was not working when I last tried it (late 2021). It seemed to make 
+    progress on the first few iterations but then never converge.
+    
+    The method is described in Wang et al. (2019) and apparently should work.
     """
     n_dims = 4
     n_proj = len(projections)
@@ -492,10 +494,18 @@ def pic4D(projections, tmats, grid_rec, grid_meas, max_iters=15):
     #         axes.format(xticks=[], yticks=[])
     #         plt.show()
 
-    Z = np.histogramdd(X, rec_edges)
-    return Z, projections
+    f = np.histogramdd(X, rec_edges)
+    return f, projections
 
 
 def ment4D():
-    """Direct four-dimensional maximum entropy (MENT) reconstruction."""
+    """Direct four-dimensional maximum entropy (MENT) reconstruction.
+    
+    J. Wong has implemented an analytic solution given a special set of projections
+    (not x-y). The general problem demands an iterative solution. 
+    
+    N-dimensional MENT may be useful elsewhere. For example, reconstruct a 6D image given
+    a 5D and 4D projection. The accuracy and performance of MENT in these high-dimensional
+    cases is unknown.
+    """
     raise NotImplementedError
