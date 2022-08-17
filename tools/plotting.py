@@ -225,8 +225,7 @@ def _setup_corner(n, diag, labels, limits=None, **fig_kws):
             axes[:, i].format(xlim=limits[i])
         for i in range(start, nrows):
             axes[i, :].format(ylim=limits[i])
-    for ax in axes:
-        ax.format(xtickminor=True, ytickminor=True)
+    axes.format(xtickminor=True, ytickminor=True, xlocator=('maxn', 3), ylocator=('maxn', 3))
     return fig, axes
 
 
