@@ -342,19 +342,19 @@ def art4D(projections, tmats, grid_rec, grid_meas, proc_kws=None, **kws):
         y = grid_rec[2][k], 
         y' = grid_rec[3][l].
     """
-    print("Forming arrays.")
+    print('Forming arrays.')
 
-    # Treat each reconstruction bin center as a particle.
+    # Treat each reconstruction bin center as a particle. 
     rec_grid_coords = get_grid_coords(*grid_rec)
     n_bins_rec = [len(c) for c in grid_rec]
     rec_grid_size = np.prod(n_bins_rec)
     col_indices = np.arange(rec_grid_size)
-
+    
     edges_meas = [get_bin_edges(_centers) for _centers in grid_meas]
     xedges_meas, yedges_meas = edges_meas
-    n_bins_meas_x = len(xedges_meas) - 1
-    n_bins_meas_y = len(yedges_meas) - 1
-    row_block_size = n_bins_meas_x * n_bins_meas_y
+    n_bins_x_meas = len(xedges_meas) - 1
+    n_bins_y_meas = len(yedges_meas) - 1
+    row_block_size = n_bins_x_meas * n_bins_y_meas
     n_proj = len(projections)
     rho = np.zeros(n_proj * row_block_size)  # measured density on the screen.
     rows, cols = [], []  # nonzero row and column indices of P
@@ -365,18 +365,18 @@ def art4D(projections, tmats, grid_rec, grid_meas, proc_kws=None, **kws):
         screen_grid_coords = apply(M, rec_grid_coords)
 
         # For each particle, record the indices of the bin it landed in. So we
-        # want (k, l) such that the particle landed in the bin with x = x[k]
-        # and y = y[l] on the screen. One of the indices will be -1 or n_bins
-        # if the particle landed outside the screen.
+        # want (k, l) such that the particle landed in the bin with x = x[k] 
+        # and y = y[l] on the screen. One of the indices will be -1 or n_bins 
+        # if the particle landed outside the screen. (Better way to do this?)
         xidx = np.digitize(screen_grid_coords[:, 0], xedges_meas) - 1
         yidx = np.digitize(screen_grid_coords[:, 2], yedges_meas) - 1
         on_screen = np.logical_and(
-            np.logical_and(xidx >= 0, xidx < n_bins_meas_x),
-            np.logical_and(yidx >= 0, yidx < n_bins_meas_y),
+            np.logical_and(xidx >= 0, xidx < n_bins_x_meas), 
+            np.logical_and(yidx >= 0, yidx < n_bins_y_meas)
         )
         # Get the indices for the flattened array.
         projection = projections[proj_index]
-        screen_idx = np.ravel_multi_index((xidx, yidx), projection.shape, mode="clip")
+        screen_idx = np.ravel_multi_index((xidx, yidx), projection.shape, mode='clip')
 
         # P[i, j] = 1 if particle j landed in bin i on the screen, 0 otherwise.
         i_offset = proj_index * row_block_size
@@ -384,25 +384,23 @@ def art4D(projections, tmats, grid_rec, grid_meas, proc_kws=None, **kws):
             i = screen_idx[j] + i_offset
             rows.append(i)
             cols.append(j)
-        rho[i_offset : i_offset + row_block_size] = projection.flat
+        rho[i_offset: i_offset + row_block_size] = projection.ravel()
 
-    print("Creating sparse matrix P.")
+    print('Creating sparse matrix P.')
     t = time.time()
-    P = sparse.csr_matrix(
-        (np.ones(len(rows)), (rows, cols)),
-        shape=(n_proj * row_block_size, rec_grid_size),
-    )
-    print("Done. t = {}".format(time.time() - t))
+    P = sparse.csr_matrix((np.ones(len(rows)), (rows, cols)), 
+                          shape=(n_proj * row_block_size, rec_grid_size))
+    print('Done. t = {}'.format(time.time() - t))
 
-    print("Solving linear system.")
+    print('Solving linear system.')
     start_time = time.time()
     psi = sparse.linalg.lsqr(P, rho, show=True, iter_lim=1000)[0]
     print()
-    print("Done. t = {}".format(time.time() - start_time))
+    print('Done. t = {}'.format(time.time() - start_time))
 
-    print("Reshaping phase space density.")
-    f = psi.reshape(tuple(n_bins_rec))
-    return f
+    print('Reshaping phase space density.')
+    Z = psi.reshape(tuple(n_bins_rec))
+    return Z
 
 
 def pic4D(projections, tmats, grid_rec, grid_meas, max_iters=15):
