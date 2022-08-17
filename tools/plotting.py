@@ -500,7 +500,7 @@ def interactive_proj2d(
     discrete = widgets.Checkbox(value=False, description="discrete")
     log = widgets.Checkbox(value=False, description="log")
     contour = widgets.Checkbox(value=False, description="contour")
-    profiles = widgets.Checkbox(value=True, description="profiles")
+    profiles = widgets.Checkbox(value=False, description="profiles")
     scale = widgets.FloatSlider(
         value=0.15,
         min=0.0,
