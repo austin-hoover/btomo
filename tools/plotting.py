@@ -381,7 +381,7 @@ def corner(
                         prof_kws=prof_kws,
                         **plot_kws,
                     )
-    # N-D image
+    # Multi-dimensional image
     else:
         if coords is None:
             coords = [np.arange(s) for s in data.shape]
@@ -407,7 +407,7 @@ def corner(
         # Univariate plots
         if diag:
             for i in range(n):
-                h = utils.project(data, j)
+                h = utils.project(data, i)
                 plot1d(coords[i], h / np.max(h), ax=axes[i, i], **diag_kws)
     # Modify diagonal y axis limits.
     if diag:
