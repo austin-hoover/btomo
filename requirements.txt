@@ -5,5 +5,5 @@ proplot==0.9.5
 pandas
 scipy
 seaborn
-skimage
+scikit-image
 tqdm
