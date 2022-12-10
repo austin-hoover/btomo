@@ -1,2 +1,2 @@
 # btomo
-Tomographic reconstruction of phase space distributions.
+Phase space tomography

@@ -1,10 +1,10 @@
 """Tomographic phase space reconstruction.
 
 All angles should be kept in radians. We convert to degrees only when passing
-the angles to skimage.
+the angles to `skimage`.
 """
-import sys
 import os
+import sys
 import time
 
 import numpy as np
@@ -15,10 +15,10 @@ from skimage.transform import iradon_sart
 from tqdm import trange
 from tqdm import tqdm
 
-from tools.utils import apply
-from tools.utils import project
-from tools.utils import get_bin_centers
-from tools.utils import get_bin_edges
+from .utils import apply
+from .utils import project
+from .utils import get_bin_centers
+from .utils import get_bin_edges
 
 
 def normalize(f, bin_volume=1.0):
